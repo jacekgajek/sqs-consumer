@@ -7,11 +7,6 @@ plugins {
 group = "pl.jacekgajek"
 version = "0.0.1"
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
 repositories {
     mavenCentral()
 }
@@ -34,7 +29,7 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core-jvm:5.9.1")
     testImplementation("io.kotest:kotest-property-jvm:5.9.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.1.0")
-    testImplementation("io.mockk:mockk-jvm:1.13.13")
+    testImplementation("io.mockk:mockk-jvm:1.14.0")
 
     // ByteBuddy (for mocking libraries, if necessary)
     implementation("net.bytebuddy:byte-buddy:1.15.1")

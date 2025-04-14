@@ -1,13 +1,13 @@
 package pl.jacekgajek.sqs.consumer.user
 
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.mockk.Called
-import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
+import io.mockk.spyk
 import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
@@ -22,7 +22,6 @@ class UserEventConsumerTest : StringSpec() {
 
 	init {
 
-		coroutineTestScope = true
 
 		val queueName = "user-queue"
 		val pollRate = 200.milliseconds
@@ -70,9 +69,7 @@ class UserEventConsumerTest : StringSpec() {
 		Then Two tenant schema was created""" {
 
 			val sqsConsumer = mockk<SqsConsumer>()
-			val userService = mockk<UserEventService>()
-
-			coEvery { userService.onUserEvent(any()) } returns Unit
+			val userService = spyk<UserEventService>(TestUserEventService())
 
 			every { sqsConsumer.createFlow<UserMessage>(any(), any(), any()) } returns flowOf(
 				createUserCreateEvent("John", "2025-01-01T00:00:00Z"),
@@ -89,16 +86,22 @@ class UserEventConsumerTest : StringSpec() {
 
 			consumer.startConsuming()
 
-			val userEvent1Slot = slot<UserMessage>()
-			val userEvent2Slot = slot<UserMessage>()
+			val userEventSlots = mutableListOf<UserMessage>()
 
-			coVerify(exactly = 1, timeout = 2000) {
-				userService.onUserEvent(capture(userEvent1Slot))
+			coVerify(exactly = 2, timeout = 2000) {
+				userService.onUserEvent(capture(userEventSlots))
 			}
 
-			userEvent1Slot.captured.name shouldBe "John"
-			userEvent2Slot.captured.name shouldBe "Mary"
+            userEventSlots shouldHaveSize 3
+            userEventSlots[1].name shouldBe "John"
+            userEventSlots[2].name shouldBe "Mary"
 		}
+	}
+}
+
+private class TestUserEventService : UserEventService {
+	override suspend fun onUserEvent(message: UserMessage) {
+        println("onUserEvent: $message")
 	}
 }
 

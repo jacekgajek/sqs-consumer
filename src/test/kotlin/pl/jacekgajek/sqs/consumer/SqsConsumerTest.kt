@@ -3,8 +3,9 @@ package pl.jacekgajek.sqs.consumer
 import aws.sdk.kotlin.services.sqs.SqsClient
 import aws.sdk.kotlin.services.sqs.model.DeleteMessageRequest
 import aws.sdk.kotlin.services.sqs.model.DeleteMessageResponse
+import aws.sdk.kotlin.services.sqs.model.GetQueueUrlRequest
+import aws.sdk.kotlin.services.sqs.model.GetQueueUrlResponse
 import aws.sdk.kotlin.services.sqs.model.ListQueuesRequest
-import aws.sdk.kotlin.services.sqs.model.ListQueuesResponse
 import aws.sdk.kotlin.services.sqs.model.Message
 import aws.sdk.kotlin.services.sqs.model.ReceiveMessageRequest
 import aws.sdk.kotlin.services.sqs.model.ReceiveMessageResponse
@@ -42,7 +43,7 @@ class SqsConsumerTest : BehaviorSpec({
 
 				coEvery { sqsClient.receiveMessage(any()) } returns response andThen ReceiveMessageResponse {}
 				coEvery { sqsClient.deleteMessage(any()) } returns DeleteMessageResponse {}
-				coEvery { sqsClient.listQueues(any()) } returns ListQueuesResponse { queueUrls = listOf(URL) }
+                coEvery { sqsClient.getQueueUrl(any()) } returns GetQueueUrlResponse { queueUrl = URL }
 
 				val sqsConsumer = sqsConsumer(sqsClient)
 
@@ -69,7 +70,7 @@ class SqsConsumerTest : BehaviorSpec({
 
 				coEvery { sqsClient.receiveMessage(any()) } returns response1 andThen response2 andThen ReceiveMessageResponse {}
 				coEvery { sqsClient.deleteMessage(any()) } returns DeleteMessageResponse {}
-				coEvery { sqsClient.listQueues(any()) } returns ListQueuesResponse { queueUrls = listOf(URL) }
+                coEvery { sqsClient.getQueueUrl(any()) } returns GetQueueUrlResponse { queueUrl = URL }
 
 				val sqsConsumer = sqsConsumer(sqsClient)
 
@@ -101,7 +102,7 @@ class SqsConsumerTest : BehaviorSpec({
 
 				coEvery { sqsClient.receiveMessage(any()) } returns response1 andThen ReceiveMessageResponse {}
 				coEvery { sqsClient.deleteMessage(any()) } returns DeleteMessageResponse {}
-				coEvery { sqsClient.listQueues(any()) } returns ListQueuesResponse { queueUrls = listOf(URL) }
+                coEvery { sqsClient.getQueueUrl(any()) } returns GetQueueUrlResponse { queueUrl = URL }
 
 				val sqsConsumer = sqsConsumer(sqsClient)
 
@@ -111,7 +112,7 @@ class SqsConsumerTest : BehaviorSpec({
 				// Then
 				items shouldHaveSize 0
 				coVerifyAll {
-					sqsClient.listQueues(ListQueuesRequest { queueNamePrefix = QUEUE_NAME })
+                    sqsClient.getQueueUrl(GetQueueUrlRequest { queueName = QUEUE_NAME })
 					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
 					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
 				}
@@ -129,7 +130,7 @@ class SqsConsumerTest : BehaviorSpec({
 
 				coEvery { sqsClient.receiveMessage(any()) } returns response1 andThen ReceiveMessageResponse {}
 				coEvery { sqsClient.deleteMessage(any()) } returns DeleteMessageResponse {}
-				coEvery { sqsClient.listQueues(any()) } returns ListQueuesResponse { queueUrls = listOf(URL) }
+                coEvery { sqsClient.getQueueUrl(any()) } returns GetQueueUrlResponse { queueUrl = URL }
 
 				val sqsConsumer = sqsConsumer(sqsClient)
 
@@ -139,7 +140,7 @@ class SqsConsumerTest : BehaviorSpec({
 				// Then
 				items shouldHaveSize 0
 				coVerifyAll {
-					sqsClient.listQueues(ListQueuesRequest { queueNamePrefix = QUEUE_NAME })
+                    sqsClient.getQueueUrl(GetQueueUrlRequest { queueName = QUEUE_NAME })
 					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
 				}
 			}
@@ -152,7 +153,7 @@ class SqsConsumerTest : BehaviorSpec({
 
 				coEvery { sqsClient.receiveMessage(any()) } throws RuntimeException("error") andThen ReceiveMessageResponse {}
 				coEvery { sqsClient.deleteMessage(any()) } returns DeleteMessageResponse {}
-				coEvery { sqsClient.listQueues(any()) } returns ListQueuesResponse { queueUrls = listOf(URL) }
+                coEvery { sqsClient.getQueueUrl(any()) } returns GetQueueUrlResponse { queueUrl = URL }
 
 				val sqsConsumer = sqsConsumer(sqsClient)
 
@@ -162,7 +163,7 @@ class SqsConsumerTest : BehaviorSpec({
 				// Then
 				items shouldHaveSize 0
 				coVerifyAll {
-					sqsClient.listQueues(ListQueuesRequest { queueNamePrefix = QUEUE_NAME })
+                    sqsClient.getQueueUrl(GetQueueUrlRequest { queueName = QUEUE_NAME })
 					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
 				}
 			}
@@ -179,7 +180,7 @@ class SqsConsumerTest : BehaviorSpec({
 
 				coEvery { sqsClient.receiveMessage(any()) } returns response1 andThen ReceiveMessageResponse {}
 				coEvery { sqsClient.deleteMessage(any()) } throws RuntimeException("error")
-				coEvery { sqsClient.listQueues(any()) } returns ListQueuesResponse { queueUrls = listOf(URL) }
+                coEvery { sqsClient.getQueueUrl(any()) } returns GetQueueUrlResponse { queueUrl = URL }
 
 				val sqsConsumer = sqsConsumer(sqsClient)
 
@@ -189,7 +190,7 @@ class SqsConsumerTest : BehaviorSpec({
 				// Then
 				items shouldHaveSize 1
 				coVerifyAll {
-					sqsClient.listQueues(ListQueuesRequest { queueNamePrefix = QUEUE_NAME })
+                    sqsClient.getQueueUrl(GetQueueUrlRequest { queueName = QUEUE_NAME })
 					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
 					sqsClient.deleteMessage(DeleteMessageRequest { queueUrl = URL; receiptHandle = "r1" })
 				}
