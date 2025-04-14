@@ -1,8 +1,8 @@
-package pl.jacekgajek.sqs.consumer.user
+package io.github.jacekgajek.sqs.consumer.user
 
 import kotlinx.coroutines.CoroutineScope
-import pl.jacekgajek.sqs.consumer.BaseEventConsumer
-import pl.jacekgajek.sqs.consumer.SqsConsumer
+import io.github.jacekgajek.sqs.consumer.BaseEventConsumer
+import io.github.jacekgajek.sqs.consumer.SqsConsumer
 import kotlin.reflect.KClass
 import kotlin.time.Duration
 

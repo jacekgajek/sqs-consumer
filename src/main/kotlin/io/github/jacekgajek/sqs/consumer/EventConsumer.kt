@@ -1,4 +1,4 @@
-package pl.jacekgajek.sqs.consumer
+package io.github.jacekgajek.sqs.consumer
 
 interface EventConsumer {
 	val isActive: Boolean

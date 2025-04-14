@@ -1,4 +1,4 @@
-package pl.jacekgajek.sqs.consumer.user
+package io.github.jacekgajek.sqs.consumer.user
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveSize
@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import pl.jacekgajek.sqs.consumer.SqsConsumer
+import io.github.jacekgajek.sqs.consumer.SqsConsumer
 import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 

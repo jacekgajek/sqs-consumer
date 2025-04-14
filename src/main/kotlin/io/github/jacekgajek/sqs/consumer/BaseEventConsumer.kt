@@ -1,4 +1,4 @@
-package pl.jacekgajek.sqs.consumer
+package io.github.jacekgajek.sqs.consumer
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineScope

@@ -1,4 +1,4 @@
-package pl.jacekgajek.sqs.consumer
+package io.github.jacekgajek.sqs.consumer
 
 import aws.sdk.kotlin.services.sqs.SqsClient
 import aws.sdk.kotlin.services.sqs.model.DeleteMessageRequest

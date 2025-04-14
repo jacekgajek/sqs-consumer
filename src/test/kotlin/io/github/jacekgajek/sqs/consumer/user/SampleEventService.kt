@@ -1,4 +1,4 @@
-package pl.jacekgajek.sqs.consumer.user
+package io.github.jacekgajek.sqs.consumer.user
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
