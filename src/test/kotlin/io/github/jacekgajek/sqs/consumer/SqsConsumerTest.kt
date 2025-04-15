@@ -207,7 +207,7 @@ internal class TestSqsConsumer(sqsClient: SqsClient) : SqsConsumer(sqsClient) {
         queueName: String,
         pollRate: Duration,
 	): Flow<T> =
-		super.createFlow(serializer, queueName, pollRate)
+		super.createFlow(serializer, queueName, pollRate, 1)
 }
 
 private suspend fun runTest(sqsConsumer: TestSqsConsumer): List<SimpleMessage> {

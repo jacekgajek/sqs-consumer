@@ -62,18 +62,17 @@ dependencies {
 
     // Regular dependencies
     implementation("aws.sdk.kotlin:sqs-jvm:1.4.5")
-    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:3.0.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     implementation("com.sksamuel.tabby:tabby-fp-jvm:2.1.7")
 
     // Test dependencies
     testImplementation("io.kotest:kotest-runner-junit5-jvm:5.9.1")
     testImplementation("io.kotest:kotest-assertions-core-jvm:5.9.1")
-    testImplementation("io.kotest:kotest-property-jvm:5.9.1")
-    testImplementation("org.jetbrains.kotlin:kotlin-test:2.1.0")
     testImplementation("io.mockk:mockk-jvm:1.14.0")
 
     // ByteBuddy (for mocking libraries, if necessary)
-    implementation("net.bytebuddy:byte-buddy:1.15.1")
+//    implementation("net.bytebuddy:byte-buddy:1.15.1")
 }
 
 tasks {
