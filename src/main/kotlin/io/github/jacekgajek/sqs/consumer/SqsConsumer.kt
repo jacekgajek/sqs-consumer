@@ -23,17 +23,35 @@ import kotlin.time.Duration
 open class SqsConsumer(private val sqsClient: SqsClient) {
     private val log = KotlinLogging.logger { }
 
+    /**
+     * Creates a flow that continuously polls messages from the specified SQS queue, deserializes them using
+     * the provided serializer, and emits the messages for processing. The flow operates as long as the coroutine
+     * context is active and processes messages at the defined polling rate.
+     *
+     * If the current coroutine context is cancelled, the flow closes only after the last message in a batch is processed.
+     *
+     * @param T The type of the messages being processed.
+     * @param serializer The serializer used to deserialize messages from the queue.
+     * @param queueName The name of the SQS queue to poll messages from.
+     * @param pollRate The interval at which the queue is polled for messages.
+     * @param maxNumberOfMessagesInBatch The maximum number of messages to retrieve in a single poll (default is 10).
+     * @return A flow emitting deserialized messages from the queue.
+     * @throws QueueNotFoundException When the specified queue cannot be found.
+     */
+    @Throws(QueueNotFoundException::class)
     fun <T : Any> createFlow(
         serializer: KSerializer<T>,
         queueName: String,
         pollRate: Duration,
+        maxNumberOfMessagesInBatch: Int = 10,
     ): Flow<T> =
-        SqsConsumerImpl(serializer, queueName, pollRate).createFlow()
+        SqsConsumerImpl(serializer, queueName, pollRate, maxNumberOfMessagesInBatch).createFlow()
 
-    protected inner class SqsConsumerImpl<T : Any>(
+    private inner class SqsConsumerImpl<T : Any>(
         private val serializer: KSerializer<T>,
         private val queueName: String,
         private val pollRate: Duration,
+        private val maxNumberOfMessagesInBatch: Int,
     ) {
         private var cachedQueueUrl: String? = null
 
@@ -41,7 +59,7 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
             while (currentCoroutineContext().isActive) {
                 getQueueUrl().map { queueUrl ->
                     consumeMessage(queueUrl).onSuccess { response ->
-                        response.messages?.processSingleMessage { receiptHandle, body ->
+                        response.messages?.processMessages { receiptHandle, body ->
                             decode(body).onSuccess { message ->
                                 log.trace { "Successfully received and parsed a message of type [${message::class.qualifiedName}]." }
                                 emit(message)
@@ -55,10 +73,9 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
             }
         }
 
-        private suspend fun List<Message>.processSingleMessage(consumer: suspend (receiptHandle: String, body: String) -> Unit) =
-            this.singleOrNull()
-                ?.takeIf { it.receiptHandle != null && it.body != null }
-                ?.let { consumer(it.receiptHandle!!, it.body!!) }
+        private suspend fun List<Message>.processMessages(consumer: suspend (receiptHandle: String, body: String) -> Unit) =
+            this.filter { it.receiptHandle != null && it.body != null }
+                .forEach { consumer(it.receiptHandle!!, it.body!!) }
 
         private suspend fun getQueueUrl(): Result<String> =
             cachedQueueUrl.failureIfNull { QueueNotFoundException("Cannot get queue url for queue $queueName.") }
@@ -79,23 +96,15 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
         private suspend fun consumeMessage(queueUrlArg: String) = catching {
             sqsClient.receiveMessage(ReceiveMessageRequest {
                 queueUrl = queueUrlArg
-                maxNumberOfMessages = 1
+                maxNumberOfMessages = maxNumberOfMessagesInBatch
             })
         }.onFailure { log.error(it) { "Error during receiving a message from $queueUrlArg: ${it.message}" } }
 
         private fun decode(messageBody: String): Result<T> = catching {
-            Json.decodeFromString(serializer, processRawBody(messageBody))
+            Json.decodeFromString(serializer, messageBody)
                 .also { log.trace { "Successfully decoded a message from queue $messageBody: $it" } }
         }.onFailure { log.error(it) { "Cannot deserialize a message with $serializer: $messageBody" } }
     }
-
-    /**
-     * Additional operation to perform on the message body before deserializing it into the target type.
-     *
-     * @param messageBody The raw message body to be processed.
-     * @return The processed message body ready for deserialization.
-     */
-    open fun processRawBody(messageBody: String): String = messageBody
 
     /**
      * If this [Result] is a failure, maps it to result of [block] method and unwraps it from a nested [Result].
@@ -112,4 +121,14 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
         }
 }
 
-class QueueNotFoundException(queue: String) : Exception("Could not find queue: [$queue]")
+/**
+ * Exception thrown when the provided SQS queue cannot be found.
+ *
+ * This exception is raised when attempting to retrieve the URL
+ * of an SQS queue, but the queue name does not resolve to a valid queue
+ * within AWS SQS. It serves as an indicator of an operational issue where
+ * the queue may not exist, is misconfigured, or is inaccessible.
+ *
+ * @param queue The name of the SQS queue that could not be found.
+ */
+class QueueNotFoundException(queue: String) : RuntimeException("Could not find queue: [$queue]")
