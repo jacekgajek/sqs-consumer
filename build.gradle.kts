@@ -1,10 +1,10 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     kotlin("jvm") version "2.1.0"
     kotlin("plugin.serialization") version "2.1.0"
 
-    id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
-    `maven-publish`
-    signing
+    id("com.vanniktech.maven.publish") version "0.31.0-rc2"
 }
 
 val theGroup = "io.github.jacekgajek"
@@ -18,56 +18,39 @@ repositories {
     mavenCentral()
 }
 
-nexusPublishing {
-    repositories {
-        sonatype {
-            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
-        }
-    }
-}
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            groupId = theGroup
-            artifactId = theArtifact
-            version = theVersion
+mavenPublishing {
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
 
-            from(components["java"])
+    signAllPublications()
 
-            pom {
-                signing {
-                    sign(publishing.publications["maven"])
-                }
-                name.set("SQS Consumer")
-                description.set("Simple AWS SQS consumer for Kotlin which emits events as a Flow.")
-                url.set("https://github.com/jacekgajek/sqs-consumer")
-                licenses {
-                    license {
-                        name.set("MIT License")
-                        url.set("https://opensource.org/licenses/MIT")
-                    }
-                }
-                developers {
-                    developer {
-                        id.set("jacekgajek")
-                        name.set("Jacek Gajek")
-                        email.set("jacek.s.gajek at gmail.com")
-                        url.set("https://github.com/jacekgajek")
-                        organization.set("jacekgajek")
-                        organizationUrl.set("https://github.com/jacekgajek")
-                    }
-                }
-                scm {
-                    connection.set("scm:git:git://github.com/jacekgajek/sqs-consumer.git")
-                    developerConnection.set("scm:git:ssh://github.com/jacekgajek/sqs-consumer.git")
-                    url.set("https://github.com/jacekgajek/sqs-consumer")
-                }
+    coordinates(theGroup, theArtifact, theVersion)
+    pom {
+        name.set("SQS Consumer")
+        description.set("Simple AWS SQS consumer for Kotlin which emits events as a Flow.")
+        url.set("https://github.com/jacekgajek/sqs-consumer")
+        licenses {
+            license {
+                name.set("MIT License")
+                url.set("https://opensource.org/licenses/MIT")
             }
         }
+        developers {
+            developer {
+                id.set("jacekgajek")
+                name.set("Jacek Gajek")
+                email.set("jacek.s.gajek at gmail.com")
+                url.set("https://github.com/jacekgajek")
+                organization.set("jacekgajek")
+                organizationUrl.set("https://github.com/jacekgajek")
+            }
+        }
+        scm {
+            connection.set("scm:git:git://github.com/jacekgajek/sqs-consumer.git")
+            developerConnection.set("scm:git:ssh://github.com/jacekgajek/sqs-consumer.git")
+            url.set("https://github.com/jacekgajek/sqs-consumer")
+        }
     }
 }
-
 
 dependencies {
     // Provided dependencies (compileOnly for Gradle to replicate Maven's "provided" scope)
@@ -91,10 +74,6 @@ dependencies {
 
     // ByteBuddy (for mocking libraries, if necessary)
     implementation("net.bytebuddy:byte-buddy:1.15.1")
-}
-
-signing {
-    sign(publishing.publications["maven"])
 }
 
 tasks {
