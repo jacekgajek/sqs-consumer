@@ -9,7 +9,7 @@ plugins {
 
 val theGroup = "io.github.jacekgajek"
 val theArtifact = "sqs-consumer"
-val theVersion = "0.0.7"
+val theVersion = "0.0.8"
 
 group = theGroup
 version = theVersion
