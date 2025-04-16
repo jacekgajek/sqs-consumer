@@ -4,9 +4,12 @@ import aws.sdk.kotlin.services.sqs.SqsClient
 import aws.sdk.kotlin.services.sqs.model.DeleteMessageRequest
 import aws.sdk.kotlin.services.sqs.model.GetQueueUrlRequest
 import aws.sdk.kotlin.services.sqs.model.Message
+import aws.sdk.kotlin.services.sqs.model.QueueDoesNotExist
 import aws.sdk.kotlin.services.sqs.model.ReceiveMessageRequest
 import com.sksamuel.tabby.results.catching
 import com.sksamuel.tabby.results.failureIfNull
+import com.sksamuel.tabby.results.flatMap
+import com.sksamuel.tabby.results.mapError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -15,6 +18,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlin.getOrThrow
 import kotlin.time.Duration
 
 /**
@@ -56,14 +60,16 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
         private var cachedQueueUrl: String? = null
 
         fun createFlow() = flow {
+            log.info { "Starting to consume messages from queue [$queueName]." }
+            delay(pollRate)
             while (currentCoroutineContext().isActive) {
-                getQueueUrl().map { queueUrl ->
+                getQueueUrl().let { queueUrl ->
                     consumeMessage(queueUrl).onSuccess { response ->
                         response.messages?.processMessages { receiptHandle, body ->
                             decode(body).onSuccess { message ->
                                 log.trace { "Successfully received and parsed a message of type [${message::class.qualifiedName}]." }
                                 emit(message)
-                                log.debug { "Processing a message of type [${message::class.qualifiedName}] completed without exception. Deleting it from the queue [$queueName]." }
+                                log.trace { "Processing a message of type [${message::class.qualifiedName}] completed without exception. Deleting it from the queue [$queueName]." }
                                 deleteMessage(queueUrl, receiptHandle)
                             }
                         }
@@ -77,14 +83,23 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
             this.filter { it.receiptHandle != null && it.body != null }
                 .forEach { consumer(it.receiptHandle!!, it.body!!) }
 
-        private suspend fun getQueueUrl(): Result<String> =
+        private suspend fun getQueueUrl(): String =
             cachedQueueUrl.failureIfNull { QueueNotFoundException("Cannot get queue url for queue $queueName.") }
                 .coFlatRecover { fetchQueueUrl() }
+                .getOrThrow()
 
         private suspend fun fetchQueueUrl(): Result<String> =
-            sqsClient.getQueueUrl(GetQueueUrlRequest { queueName = this@SqsConsumerImpl.queueName })
-                .queueUrl
-                .failureIfNull()
+            catching {
+                sqsClient.getQueueUrl(GetQueueUrlRequest { queueName = this@SqsConsumerImpl.queueName })
+            }
+                .mapError {
+                    if (it is QueueDoesNotExist) {
+                        QueueNotFoundException(queueName)
+                    } else {
+                        it
+                    }
+                }
+                .flatMap { it.queueUrl.failureIfNull { QueueNotFoundException(queueName) } }
 
         private suspend fun deleteMessage(queueUrlArg: String, messageReceiptHandle: String) = catching {
             sqsClient.deleteMessage(DeleteMessageRequest {
