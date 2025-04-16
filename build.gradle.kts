@@ -70,9 +70,6 @@ dependencies {
     testImplementation("io.kotest:kotest-runner-junit5-jvm:5.9.1")
     testImplementation("io.kotest:kotest-assertions-core-jvm:5.9.1")
     testImplementation("io.mockk:mockk-jvm:1.14.0")
-
-    // ByteBuddy (for mocking libraries, if necessary)
-//    implementation("net.bytebuddy:byte-buddy:1.15.1")
 }
 
 tasks {
