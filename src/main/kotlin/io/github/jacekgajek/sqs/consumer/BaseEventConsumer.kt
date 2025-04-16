@@ -28,6 +28,7 @@ abstract class BaseEventConsumer<T : Any>(
     private val pollRate: Duration,
     private val coroutineScope: CoroutineScope,
     private val dataClazz: KClass<T>,
+    private val maxNumberOfMessagesInBatch: Int = 1,
 ) : EventConsumer {
     private val consumerName = this::class.simpleName
     private var job: Job? = null
@@ -46,7 +47,7 @@ abstract class BaseEventConsumer<T : Any>(
             log.info { "Starting the $consumerName." }
 
             val defaultSerializer = defaultSerializer()
-            consumer.createFlow(queueName, pollRate)
+            consumer.createFlow(queueName, pollRate, maxNumberOfMessagesInBatch)
                 .map { decode(it, customSerializer(it, defaultSerializer)) }
                 .map { it.getOrThrow() }
                 .onEach { event ->
