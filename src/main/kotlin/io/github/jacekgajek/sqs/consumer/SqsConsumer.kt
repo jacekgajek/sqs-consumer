@@ -16,9 +16,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
-import kotlin.getOrThrow
 import kotlin.time.Duration
 
 /**
@@ -28,31 +25,26 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
     private val log = KotlinLogging.logger { }
 
     /**
-     * Creates a flow that continuously polls messages from the specified SQS queue, deserializes them using
-     * the provided serializer, and emits the messages for processing. The flow operates as long as the coroutine
-     * context is active and processes messages at the defined polling rate.
+     * Creates a flow that continuously polls messages from the specified SQS queue and emits the messages for processing.
+     * The flow operates as long as the coroutine context is active and processes messages at the defined polling rate.
      *
      * If the current coroutine context is cancelled, the flow closes only after the last message in a batch is processed.
      *
-     * @param T The type of the messages being processed.
-     * @param serializer The serializer used to deserialize messages from the queue.
      * @param queueName The name of the SQS queue to poll messages from.
      * @param pollRate The interval at which the queue is polled for messages.
-     * @param maxNumberOfMessagesInBatch The maximum number of messages to retrieve in a single poll (default is 10).
+     * @param maxNumberOfMessagesInBatch The maximum number of messages to retrieve in a single poll (default is 1).
      * @return A flow emitting deserialized messages from the queue.
      * @throws QueueNotFoundException When the specified queue cannot be found.
      */
     @Throws(QueueNotFoundException::class)
-    fun <T : Any> createFlow(
-        serializer: KSerializer<T>,
+    fun createFlow(
         queueName: String,
         pollRate: Duration,
-        maxNumberOfMessagesInBatch: Int = 10,
-    ): Flow<T> =
-        SqsConsumerImpl(serializer, queueName, pollRate, maxNumberOfMessagesInBatch).createFlow()
+        maxNumberOfMessagesInBatch: Int = 1,
+    ): Flow<String> =
+        SqsConsumerImpl(queueName, pollRate, maxNumberOfMessagesInBatch).createFlow()
 
-    private inner class SqsConsumerImpl<T : Any>(
-        private val serializer: KSerializer<T>,
+    private inner class SqsConsumerImpl(
         private val queueName: String,
         private val pollRate: Duration,
         private val maxNumberOfMessagesInBatch: Int,
@@ -60,23 +52,22 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
         private var cachedQueueUrl: String? = null
 
         fun createFlow() = flow {
-            log.info { "Starting to consume messages from queue [$queueName]." }
             delay(pollRate)
+            log.info { "Starting to consume messages from queue [$queueName]." }
+
             while (currentCoroutineContext().isActive) {
                 getQueueUrl().let { queueUrl ->
                     consumeMessage(queueUrl).onSuccess { response ->
-                        response.messages?.processMessages { receiptHandle, body ->
-                            decode(body).onSuccess { message ->
-                                log.trace { "Successfully received and parsed a message of type [${message::class.qualifiedName}]." }
-                                emit(message)
-                                log.trace { "Processing a message of type [${message::class.qualifiedName}] completed without exception. Deleting it from the queue [$queueName]." }
-                                deleteMessage(queueUrl, receiptHandle)
-                            }
+                        response.messages?.processMessages { receiptHandle, message ->
+                            log.trace { "Successfully received and parsed a message of type [${message::class.qualifiedName}]." }
+                            emit(message)
+                            log.trace { "Processing a message of type [${message::class.qualifiedName}] completed without exception. Deleting it from the queue [$queueName]." }
+                            deleteMessage(queueUrl, receiptHandle)
                         }
                     }
                 }
-                delay(pollRate)
             }
+            delay(pollRate)
         }
 
         private suspend fun List<Message>.processMessages(consumer: suspend (receiptHandle: String, body: String) -> Unit) =
@@ -115,10 +106,6 @@ open class SqsConsumer(private val sqsClient: SqsClient) {
             })
         }.onFailure { log.error(it) { "Error during receiving a message from $queueUrlArg: ${it.message}" } }
 
-        private fun decode(messageBody: String): Result<T> = catching {
-            Json.decodeFromString(serializer, messageBody)
-                .also { log.trace { "Successfully decoded a message from queue $messageBody: $it" } }
-        }.onFailure { log.error(it) { "Cannot deserialize a message with $serializer: $messageBody" } }
     }
 
     /**

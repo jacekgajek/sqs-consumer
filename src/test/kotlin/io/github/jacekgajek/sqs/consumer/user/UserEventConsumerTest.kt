@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import io.github.jacekgajek.sqs.consumer.SqsConsumer
+import kotlinx.coroutines.delay
+import kotlinx.serialization.json.Json
 import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -29,7 +31,7 @@ class UserEventConsumerTest : StringSpec() {
 
 		"""Given SQS Consumer emits no items
 		When Consumer is started
-		Then Tenant consumer isAlive returns true""" {
+		Then consumer isAlive returns true""" {
 			val sqsConsumer = mockk<SqsConsumer>()
 			val userService = mockk<UserEventService>()
 
@@ -47,7 +49,7 @@ class UserEventConsumerTest : StringSpec() {
 
 		"""Given SQS Consumer emits no items
 		When Consumer is started
-		Then Tenant service is not called""" {
+		Then service is not called""" {
 
 			val sqsConsumer = mockk<SqsConsumer>()
 			val userService = mockk<UserEventService>()
@@ -64,16 +66,49 @@ class UserEventConsumerTest : StringSpec() {
 			verify { userService wasNot Called }
 		}
 
-		"""Given SQS Consumer emits two items
+
+        """Given SQS Consumer emits two items
 		When Consumer is started
-		Then Two tenant schema was created""" {
+		Then Two items are received""" {
+
+            val sqsConsumer = mockk<SqsConsumer>()
+            val userService = spyk<UserEventService>(TestUserEventService())
+
+            every { sqsConsumer.createFlow(any(), any(), any()) } returns flowOf(
+                createUserCreateEvent("John", "2025-01-01T00:00:00Z"),
+                createUserCreateEvent("Mary", "2025-01-01T01:00:00Z"),
+            )
+
+            val consumer = SampleEventConsumer.of(
+                sqsConsumer,
+                queueName,
+                pollRate,
+                userService,
+                CoroutineScope(IO),
+            )
+
+            consumer.startConsuming()
+
+            val userEventSlots = mutableListOf<UserMessage>()
+
+            coVerify(exactly = 2, timeout = 2000) {
+                userService.onUserEvent(capture(userEventSlots))
+            }
+
+            userEventSlots shouldHaveSize 3
+            userEventSlots[1].name shouldBe "John"
+            userEventSlots[2].name shouldBe "Mary"
+        }
+
+		"""Given SQS Consumer emits invalid item
+		When Consumer is started
+		Then no message is received""" {
 
 			val sqsConsumer = mockk<SqsConsumer>()
 			val userService = spyk<UserEventService>(TestUserEventService())
 
-			every { sqsConsumer.createFlow<UserMessage>(any(), any(), any()) } returns flowOf(
-				createUserCreateEvent("John", "2025-01-01T00:00:00Z"),
-				createUserCreateEvent("Mary", "2025-01-01T01:00:00Z"),
+			every { sqsConsumer.createFlow(any(), any(), any()) } returns flowOf(
+				"}invalid message{"
 			)
 
 			val consumer = SampleEventConsumer.of(
@@ -86,15 +121,10 @@ class UserEventConsumerTest : StringSpec() {
 
 			consumer.startConsuming()
 
-			val userEventSlots = mutableListOf<UserMessage>()
-
-			coVerify(exactly = 2, timeout = 2000) {
-				userService.onUserEvent(capture(userEventSlots))
+			coVerify(exactly = 0, timeout = 2000) {
+				userService.onUserEvent(any())
 			}
-
-            userEventSlots shouldHaveSize 3
-            userEventSlots[1].name shouldBe "John"
-            userEventSlots[2].name shouldBe "Mary"
+            delay(1000)
 		}
 	}
 }
@@ -109,11 +139,11 @@ private class TestUserEventService : UserEventService {
 private fun createUserCreateEvent(
     name: String,
     created: String,
-): UserMessage {
-    return UserMessage(
+): String {
+    return Json.encodeToString(UserMessage(
         id = UserId("123"),
         name = name,
         createdAt = Instant.parse(created),
-    )
+    ))
 }
 

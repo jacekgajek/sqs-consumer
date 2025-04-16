@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -74,8 +75,11 @@ class SqsConsumerTest : BehaviorSpec({
 
 				val sqsConsumer = sqsConsumer(sqsClient)
 
-				// When
+                val mySerializer: KSerializer<SimpleMessage> = serializer()
+
+                // When
 				val items = runTest(sqsConsumer)
+                    .map { Json.decodeFromString(mySerializer, it) }
 
 				// Then
 				items shouldHaveSize 2
@@ -87,61 +91,6 @@ class SqsConsumerTest : BehaviorSpec({
 					sqsClient.deleteMessage(DeleteMessageRequest { queueUrl = URL; receiptHandle = "r1" })
 					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
 					sqsClient.deleteMessage(DeleteMessageRequest { queueUrl = URL; receiptHandle = "r2" })
-				}
-			}
-		}
-
-		`when`("Message is invalid") {
-			then("No item is emitted") {
-				// Given
-				val sqsClient = mockk<SqsClient>()
-
-				val response1 = ReceiveMessageResponse {
-					messages = listOf(Message { receiptHandle = "r1"; body = "}{" })
-				}
-
-				coEvery { sqsClient.receiveMessage(any()) } returns response1 andThen ReceiveMessageResponse {}
-				coEvery { sqsClient.deleteMessage(any()) } returns DeleteMessageResponse {}
-                coEvery { sqsClient.getQueueUrl(any()) } returns GetQueueUrlResponse { queueUrl = URL }
-
-				val sqsConsumer = sqsConsumer(sqsClient)
-
-				// When
-				val items = runTest(sqsConsumer)
-
-				// Then
-				items shouldHaveSize 0
-				coVerifyAll {
-                    sqsClient.getQueueUrl(GetQueueUrlRequest { queueName = QUEUE_NAME })
-					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
-					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
-				}
-			}
-		}
-
-		`when`("Message does not have a correct schema") {
-			then("No item is emitted") {
-				// Given
-				val sqsClient = mockk<SqsClient>()
-
-				val response1 = ReceiveMessageResponse {
-					messages = listOf(Message { receiptHandle = "r1"; body = "{}" })
-				}
-
-				coEvery { sqsClient.receiveMessage(any()) } returns response1 andThen ReceiveMessageResponse {}
-				coEvery { sqsClient.deleteMessage(any()) } returns DeleteMessageResponse {}
-                coEvery { sqsClient.getQueueUrl(any()) } returns GetQueueUrlResponse { queueUrl = URL }
-
-				val sqsConsumer = sqsConsumer(sqsClient)
-
-				// When
-				val items = runTest(sqsConsumer)
-
-				// Then
-				items shouldHaveSize 0
-				coVerifyAll {
-                    sqsClient.getQueueUrl(GetQueueUrlRequest { queueName = QUEUE_NAME })
-					sqsClient.receiveMessage(ReceiveMessageRequest { queueUrl = URL; maxNumberOfMessages = 1 })
 				}
 			}
 		}
@@ -202,18 +151,17 @@ class SqsConsumerTest : BehaviorSpec({
 private fun sqsConsumer(sqsClient: SqsClient) = TestSqsConsumer(sqsClient)
 
 internal class TestSqsConsumer(sqsClient: SqsClient) : SqsConsumer(sqsClient) {
-	fun <T : Any> createFlowImpl(
-        serializer: KSerializer<T>,
+	fun  createFlowImpl(
         queueName: String,
         pollRate: Duration,
-	): Flow<T> =
-		super.createFlow(serializer, queueName, pollRate, 1)
+	): Flow<String> =
+		super.createFlow(queueName, pollRate, 1)
 }
 
-private suspend fun runTest(sqsConsumer: TestSqsConsumer): List<SimpleMessage> {
-	val items = mutableListOf<SimpleMessage>()
+private suspend fun runTest(sqsConsumer: TestSqsConsumer): List<String> {
+	val items = mutableListOf<String>()
 	withTimeoutOrNull(FLOW_TIME_OUT) {
-		sqsConsumer.createFlowImpl(serializer<SimpleMessage>(), QUEUE_NAME, POLL_RATE.milliseconds).toList(items)
+		sqsConsumer.createFlowImpl(QUEUE_NAME, POLL_RATE.milliseconds).toList(items)
 	}
 	return items
 }
