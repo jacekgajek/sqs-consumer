@@ -43,9 +43,9 @@ abstract class BaseEventConsumer<T : Any> (
 
 			consumer.createFlow(defaultSerializer(), queueName, pollRate)
 				.onEach { event ->
-					log.info { "Received ${dataClazz.simpleName} event." }
+					log.trace { "Received ${dataClazz.simpleName} event." }
 					processMessage(event)
-					log.debug { "Finished processing ${dataClazz.simpleName} event." }
+					log.trace { "Finished processing ${dataClazz.simpleName} event." }
 				}
 				.retry { ex ->
                     if (ex is QueueNotFoundException) {
